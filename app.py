@@ -13,11 +13,11 @@ from auth import get_gmail_service
 gtm_id = "GTM-54JS276X"
 
 gtm_script = f"""
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+<script>(function(w,d,s,l,i){{w[l]=w[l]||[];w[l].push({{'gtm.start':
+new Date().getTime(),event:'gtm.js'}});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-54JS276X');</script>
+}})(window,document,'script','dataLayer','{GTM-54JS276X}');</script>
 """
 # <!-- End Google Tag Manager -->
 
