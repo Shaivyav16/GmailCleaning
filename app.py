@@ -153,7 +153,7 @@ with col_a:
         service = get_gmail_service()
         all_messages = []
         next_page_token = None
-        target_limit = 40000
+        target_limit = 10000
 
         # Create user hash for privacy-safe logging
         user_profile = service.users().getProfile(userId='me').execute()
