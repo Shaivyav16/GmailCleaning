@@ -8,8 +8,7 @@ import hashlib
 import pandas as pd
 from datetime import datetime
 from auth import get_gmail_service
-from streamlit_gsheets import GSheetsConnection
-conn = st.connection("gsheets", type=GSheetsConnection)
+
 
 # --- 1. INITIALIZATION & CONNECTION ---
 if 'leaderboard' not in st.session_state:
@@ -27,26 +26,26 @@ if 'user_id_hash' not in st.session_state:
 
 
 # --- 2. LOGGING ENGINE ---
-def log_event(user_hash, action, count=1):
-    """Logs app activity to Google Sheets for analytics."""
-    try:
-        # Read current data from Sheet1
-        existing_data = conn.read(worksheet="Sheet1", ttl=0)
+# def log_event(user_hash, action, count=1):
+#     """Logs app activity to Google Sheets for analytics."""
+#     try:
+#         # Read current data from Sheet1
+#         existing_data = conn.read(worksheet="Sheet1", ttl=0)
         
-        # Prepare new entry
-        new_row = pd.DataFrame([{
-            "user_hash": user_hash,
-            "action_type": action,
-            "count": count,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }])
+#         # Prepare new entry
+#         new_row = pd.DataFrame([{
+#             "user_hash": user_hash,
+#             "action_type": action,
+#             "count": count,
+#             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#         }])
         
-        # Append and push update
-        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-        conn.update(worksheet="Sheet1", data=updated_df)
-    except Exception as e:
-        # Fails silently in UI but shows in logs to keep app running
-        print(f"Logging failed: {e}")
+#         # Append and push update
+#         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+#         conn.update(worksheet="Sheet1", data=updated_df)
+#     except Exception as e:
+#         # Fails silently in UI but shows in logs to keep app running
+#         print(f"Logging failed: {e}")
 
 # --- 3. GMAIL & MATH ENGINE ---
 def update_sketch(email):
