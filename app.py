@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime
 from auth import get_gmail_service
 
-<!-- Google Tag Manager -->
+# <!-- Google Tag Manager -->
 gtm_id = "GTM-54JS276X"
 
 gtm_script = f"""
@@ -19,7 +19,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-54JS276X');</script>
 """
-<!-- End Google Tag Manager -->
+# <!-- End Google Tag Manager -->
 
 # This injects the tag into the app invisibly
 components.html(gtm_script, height=0, width=0)
