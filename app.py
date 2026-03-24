@@ -23,7 +23,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 # <!-- End Google Tag Manager -->
 
 # This injects the tag into the app invisibly
-components.html(gtm_script, height=0, width=0)
+with st.container():
+    components.html(gtm_script, height=0, width=0)
 
 # --- 1. INITIALIZATION & CONNECTION ---
 if 'leaderboard' not in st.session_state:
