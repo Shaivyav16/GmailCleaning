@@ -8,11 +8,14 @@ import hashlib
 import pandas as pd
 from datetime import datetime
 from auth import get_gmail_service
-from streamlit_gsheets import GSheetsConnection
 
 # --- 1. INITIALIZATION & CONNECTION ---
 if 'leaderboard' not in st.session_state:
     st.session_state.leaderboard = {}
+if 'total_size' not in st.session_state: # NEW: Tracks total inbox size in bytes
+    st.session_state.total_size = 0
+if 'sender_sizes' not in st.session_state: # NEW: Tracks size per sender for accurate deletion
+    st.session_state.sender_sizes = {}
 if 'grid' not in st.session_state:
     st.session_state.grid = np.zeros((4, 1000))
 if 'last_scanned' not in st.session_state:
@@ -20,11 +23,6 @@ if 'last_scanned' not in st.session_state:
 if 'user_id_hash' not in st.session_state:
     st.session_state.user_id_hash = None
 
-# Initialize the Google Sheets connection
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error("GSheets Connection Error. Check your Streamlit Secrets.")
 
 # --- 2. LOGGING ENGINE ---
 def log_event(user_hash, action, count=1):
@@ -60,12 +58,12 @@ def update_sketch(email):
 
 def delete_existing_emails(service, sender_email):
     """Trashes unread emails from a specific sender."""
-    query = f"from:{sender_email} is:unread in:inbox"
+    query = f"from:{sender_email} in:inbox"
     try:
         results = service.users().messages().list(userId='me', q=query).execute()
         messages = results.get('messages', [])
         if not messages:
-            st.toast(f"No unread emails found for {sender_email}")
+            st.toast(f"No emails found for {sender_email}")
             return 0
         
         for msg in messages:
@@ -100,20 +98,45 @@ def confirm_future_delete(service, sender_email, user_id_hash):
 st.set_page_config(page_title="Clean up your Gmail", layout="wide")
 st.title("📬 Clean up your Gmail")
 
-# Display Timestamp
-if st.session_state.last_scanned:
-    st.caption(f"🕒 Last successful scan: {st.session_state.last_scanned}")
-else:
-    st.caption("🕒 No scan data yet. Click below to start.")
+# Helper to format size nicely
+def format_size(size_bytes):
+    mb = size_bytes / (1024 * 1024)
+    if mb < 1024:
+        return f"{mb:.1f} MB"
+    return f"{mb/1024:.2f} GB"
+
+# Initialize variables if they don't exist
+if 'total_size' not in st.session_state:
+    st.session_state.total_size = 0
+
+# Display Timestamp and size 
+
+# Create two columns for the Metadata (Time and Size)
+meta_col1, meta_col2 = st.columns([2, 1])
+
+with meta_col1:
+ if st.session_state.last_scanned:
+     st.caption(f"🕒 Last successful scan: {st.session_state.last_scanned}")
+ else:
+     st.caption("🕒 No scan data yet. Click below to start.")
+
+with meta_col2:
+    # This displays the size right next to the timestamp
+    current_size = format_size(st.session_state.get('total_size', 0))
+    st.metric(
+        label="📦 Total Inbox Volume:",
+        value=current_size,
+        help="This size is an estimate, in order to free up the space you will have to go to your trash in gmail and click on 'empty trash'."
+    )
 
 col_a, col_b = st.columns(2)
 
 with col_a:
-    if st.button("🚀 Start Scanning Unread Emails", use_container_width=True):
+    if st.button("🚀 Start Scanning All Inbox Emails", use_container_width=True):
         service = get_gmail_service()
         all_messages = []
         next_page_token = None
-        target_limit = 20000
+        target_limit = 40000
 
         # Create user hash for privacy-safe logging
         user_profile = service.users().getProfile(userId='me').execute()
@@ -126,8 +149,8 @@ with col_a:
         status_msg = st.info("📑 Gathering email list...")
         while len(all_messages) < target_limit:
             results = service.users().messages().list(
-                userId='me', q='label:unread label:inbox -label:trash', 
-                maxResults=500, pageToken=next_page_token
+                userId='me', q='label:inbox -label:trash', 
+                maxResults=1000, pageToken=next_page_token
             ).execute()
             all_messages.extend(results.get('messages', []))
             next_page_token = results.get('nextPageToken')
@@ -144,6 +167,9 @@ with col_a:
             if exception is None:
                 headers = response.get('payload', {}).get('headers', [])
                 sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown")
+                size = response.get('sizeEstimate', 0)
+                st.session_state.total_size += size
+                st.session_state.sender_sizes[sender] = st.session_state.sender_sizes.get(sender, 0) + size
                 update_sketch(sender)
 
         batch_size = 50
@@ -160,51 +186,71 @@ with col_a:
             progress_text.text(f"Scanning {i + batch_size} / {total} emails...")
         
         st.session_state.last_scanned = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        st.rerun()
+        # st.rerun()
 
-with col_b:
+with st.sidebar:
+    st.header("⚙️ App Controls")
+    
     if st.button("🗑️ Reset All Data", use_container_width=True):
         st.session_state.grid = np.zeros((4, 1000))
         st.session_state.leaderboard = {}
         st.session_state.last_scanned = None
+
+# ADD THESE TWO LINES TO CLEAR THE SIZE METRICS
+        st.session_state.total_size = 0
+        st.session_state.sender_sizes = {}
         st.rerun()
+    
+    st.info("Tip: Close this sidebar using the arrow (>) at the top left for a full-screen table view.")
 
 # --- 5. RESULTS ORGANIZATION ---
 if st.session_state.leaderboard:
     st.divider()
-    st.subheader("📊 Ranked Bulk Senders")
-    st.markdown("*Note: Verified counts are checked in real-time below.*")
-
-    top_k = sorted(st.session_state.leaderboard.items(), key=lambda x: x[1], reverse=True)[:15]
+    st.subheader("📊 Ranked Heavy Hitters")
+    
+    # 1. Get the top candidates based on estimates
+    candidates = sorted(st.session_state.leaderboard.items(), key=lambda x: x[1], reverse=True)[:15]
     service = get_gmail_service()
+    
+    # 2. PRE-VERIFY: Get actual counts for just these 15
+    verified_data = []
+    status_text = st.empty()
+    status_text.caption("Refining rankings with live data...")
+    
+    for sender, estimate in candidates:
+        try:
+            time.sleep(0.1) # Faster pause for pre-verification
+            res = service.users().messages().list(userId='me', q=f"from:{sender} in:inbox", maxResults=500).execute()
+            count = len(res.get('messages', []))
+            verified_data.append((sender, count))
+        except:
+            verified_data.append((sender, estimate))
+    
+    status_text.empty()
 
+    # 3. RE-SORT: Sort the list again using the TRUTH
+    top_k = sorted(verified_data, key=lambda x: x[1], reverse=True)
+
+    # 4. DISPLAY: Now Rank #1 will always have the highest Verified Count
     with st.container(border=True):
         h1, h2, h3, h4 = st.columns([1, 4, 2, 4])
-        h1.write("**Rank**")
-        h2.write("**Sender**")
-        h3.write("**Verified Count**")
-        h4.write("**Actions**")
-        st.divider()
+        # ... (Headers stay the same) ...
 
-        for rank, (sender, estimate) in enumerate(top_k, 1):
-            try:
-                # Real-time verification
-                real_results = service.users().messages().list(
-                    userId='me', q=f"from:{sender} is:unread in:inbox", maxResults=500
-                ).execute()
-                exact_count = len(real_results.get('messages', []))
-            except:
-                exact_count = estimate
-
+        for rank, (sender, exact_count) in enumerate(top_k, 1):
             c1, c2, c3, c4 = st.columns([1, 4, 2, 4])
             c1.write(f"#{rank}")
-            c2.write(f"`{sender}`")
-            c3.write(str(exact_count))
+            c2.write(f"`{sender}`") # Plain text fix included
+            c3.write(f"**{exact_count}**")
+            # ... (Buttons stay the same) ...
             
             btn_col1, btn_col2 = c4.columns(2)
             if btn_col1.button("Delete Past", key=f"del_{sender}"):
                 deleted_count = delete_existing_emails(service, sender)
                 if deleted_count > 0:
+                    # NEW: Subtract this sender's footprint from the total
+                    deleted_weight = st.session_state.sender_sizes.get(sender, 0)
+                    st.session_state.total_size -= deleted_weight
+
                     log_event(st.session_state.user_id_hash, "delete", count=deleted_count)
                     st.toast(f"Cleaned {sender}")
                     del st.session_state.leaderboard[sender]
