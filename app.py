@@ -8,6 +8,8 @@ import hashlib
 import pandas as pd
 from datetime import datetime
 from auth import get_gmail_service
+from streamlit_gsheets import GSheetsConnection
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- 1. INITIALIZATION & CONNECTION ---
 if 'leaderboard' not in st.session_state:
