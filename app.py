@@ -82,7 +82,7 @@ def create_future_filter(service, sender_email, user_id_hash):
     }
     try:
         service.users().settings().filters().create(userId='me', body=filter_rule).execute()
-        log_event(user_id_hash, "block")
+#        log_event(user_id_hash, "block")
     except Exception as e:
         st.error(f"Filter Error: {e}")
 
@@ -145,7 +145,7 @@ with col_a:
         st.session_state.user_id_hash = hashlib.sha256(user_email.encode()).hexdigest()
         
         # Log the scan event
-        log_event(st.session_state.user_id_hash, "scan")
+#        log_event(st.session_state.user_id_hash, "scan")
         
         status_msg = st.info("📑 Gathering email list...")
         while len(all_messages) < target_limit:
@@ -252,7 +252,7 @@ if st.session_state.leaderboard:
                     deleted_weight = st.session_state.sender_sizes.get(sender, 0)
                     st.session_state.total_size -= deleted_weight
 
-                    log_event(st.session_state.user_id_hash, "delete", count=deleted_count)
+#                    log_event(st.session_state.user_id_hash, "delete", count=deleted_count)
                     st.toast(f"Cleaned {sender}")
                     del st.session_state.leaderboard[sender]
                     st.rerun()
