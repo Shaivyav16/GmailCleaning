@@ -89,17 +89,17 @@ def delete_existing_emails(service, sender_email):
         # return len(messages)
 
     #update to delete messages using batch
-    msg_ids = [m['id'] for m in messages]
+        msg_ids = [m['id'] for m in messages]
         for i in range(0, len(msg_ids), 1000):
-            batch = msg_ids[i:i+1000]
-            service.users().messages().batchModify(
-                userId='me',
-                body={
-                    'ids': batch,
-                    'addLabelIds': ['TRASH'],
-                    'removeLabelIds': ['INBOX']
-                }
-            ).execute()
+          batch = msg_ids[i:i+1000]
+          service.users().messages().batchModify(
+              userId='me',
+              body={
+                  'ids': batch,
+                  'addLabelIds': ['TRASH'],
+                  'removeLabelIds': ['INBOX']
+                 }
+          ).execute()
         return len(messages)
 
     except Exception as e:
