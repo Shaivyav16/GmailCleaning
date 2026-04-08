@@ -372,6 +372,9 @@ def render_heavy_hitters():
             st.session_state.actioned_senders = set()
             st.rerun() # Full rerun to bring in next 15 from scratch
 
+# Call the function to display it
+render_heavy_hitters()
+
 # --- 4b. WHITELIST MANAGEMENT ---
 if st.session_state.excluded_senders:
     st.divider()
@@ -392,11 +395,6 @@ if st.session_state.excluded_senders:
                 st.toast(f"Restored {ignored_sender}")
                 time.sleep(0.5)
                 st.rerun()
-
-# Call the function to display it
-render_heavy_hitters()
-
-
 
 # --- 5. FOOTER & PRIVACY ---
 st.divider()
