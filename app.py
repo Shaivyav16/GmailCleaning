@@ -42,6 +42,8 @@ if 'user_id_hash' not in st.session_state:
     st.session_state.user_id_hash = None
 if 'excluded_senders' not in st.session_state: 
     st.session_state.excluded_senders = set()
+if 'actioned_senders' not in st.session_state: # NEW: Tracks processed rows
+    st.session_state.actioned_senders = set()
 
 # --- 2. GMAIL & MATH ENGINE ---
 def update_sketch(email):
@@ -212,6 +214,7 @@ with st.sidebar:
         st.session_state.total_size = 0
         st.session_state.sender_sizes = {}
         st.session_state.excluded_senders = set()
+        st.session_state.actioned_senders = set()
         st.rerun()
     
     st.info("Tip: Close this sidebar using the arrow (>) at the top left for a full-screen table view.")
@@ -253,37 +256,48 @@ if st.session_state.leaderboard:
         for rank, (sender, exact_count) in enumerate(top_k, 1):
             c1, c2, c3, c4 = st.columns([1, 4, 2, 4])
             c1.write(f"#{rank}")
-            c2.write(f"`{sender}`") # Plain text fix included
-            c3.write(f"**{exact_count}**")
-            # ... (Buttons stay the same) ...
+            c2.write(f"`{sender}`")
             
-           # Create three columns for the three actions
-            btn_col1, btn_col2, btn_col3 = c4.columns(3)
-            
-            if btn_col1.button("Delete", key=f"del_{sender}", help="Move all to Trash"):
-                # 1. Immediate UI update
-                deleted_weight = st.session_state.sender_sizes.get(sender, 0)
-                st.session_state.total_size -= deleted_weight
-                del st.session_state.leaderboard[sender]
+            # CHECK: If sender was actioned, show a checkmark instead of buttons
+            if sender in st.session_state.actioned_senders or sender in st.session_state.excluded_senders:
+                c3.write("✅")
+                c4.info("Processed - Click Refresh below to clear.")
+            else:
+                c3.write(f"**{exact_count}**")
+                btn_col1, btn_col2, btn_col3 = c4.columns(3)
                 
-                # 2. Background thread
-                thread = threading.Thread(target=delete_existing_emails, args=(service, sender))
-                thread.start()
+                if btn_col1.button("Delete", key=f"del_{sender}"):
+                    # Mark as actioned immediately so it doesn't move
+                    st.session_state.actioned_senders.add(sender)
+                    deleted_weight = st.session_state.sender_sizes.get(sender, 0)
+                    st.session_state.total_size -= deleted_weight
+                    
+                    # Background delete
+                    thread = threading.Thread(target=delete_existing_emails, args=(service, sender))
+                    thread.start()
+                    st.toast(f"Cleaning {sender}... 🧹")
+                    st.rerun()
                 
-                st.toast(f"Cleaning {sender}... 🧹")
-                time.sleep(0.5)
-                st.rerun()
-            
-            if btn_col2.button("Block", key=f"fut_{sender}", help="Create a filter"):
-                confirm_future_delete(service, sender, st.session_state.user_id_hash)
+                if btn_col2.button("Block", key=f"fut_{sender}"):
+                    confirm_future_delete(service, sender, st.session_state.user_id_hash)
 
-            if btn_col3.button("Ignore", key=f"ign_{sender}", help="Keep these emails & hide from list"):
-                st.session_state.excluded_senders.add(sender)
-                if sender in st.session_state.leaderboard:
-                    del st.session_state.leaderboard[sender]
-                st.toast(f"Whitelisted {sender}")
-                time.sleep(0.5)
-                st.rerun()
+                if btn_col3.button("Ignore", key=f"ign_{sender}"):
+                    st.session_state.excluded_senders.add(sender)
+                    st.toast(f"Whitelisted {sender}")
+                    st.rerun()
+
+# NEW: Refresh Button to clear processed items and load next 15
+    if st.session_state.actioned_senders or any(s in st.session_state.excluded_senders for s, _ in top_k):
+        st.write("") # Padding
+        if st.button("🔄 Refresh Table (Populate Next Heavy Hitters)", use_container_width=True, type="primary"):
+            # Permanently remove processed items from leaderboard so they don't return
+            for s in list(st.session_state.actioned_senders):
+                if s in st.session_state.leaderboard:
+                    del st.session_state.leaderboard[s]
+            
+            # Reset the action tracker for the next batch
+            st.session_state.actioned_senders = set()
+            st.rerun()
 
 # --- 4b. WHITELIST MANAGEMENT ---
 if st.session_state.excluded_senders:
