@@ -12,20 +12,22 @@ from auth import get_gmail_service
 import streamlit.components.v1 as components
 
 # <!-- Google Tag Manager -->
-gtm_id = "GTM-54JS276X"
+GA_ID = "G-6N4P9S0380"
 
-gtm_script = f"""
-<script>(function(w,d,s,l,i){{w[l]=w[l]||[];w[l].push({{'gtm.start':
-new Date().getTime(),event:'gtm.js'}});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-}})(window,document,'script','dataLayer','{gtm_id}');</script>
+ga_code = f"""
+<script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){{dataLayer.push(arguments);}}
+  gtag('js', new Date());
+  gtag('config', '{GA_ID}');
+</script>
 """
 # <!-- End Google Tag Manager -->
 
 # This injects the tag into the app invisibly
 with st.container():
-    components.html(gtm_script, height=0, width=0)
+    components.html(ga_code, height=0, width=0)
 
 # --- 1. INITIALIZATION & CONNECTION ---
 if 'leaderboard' not in st.session_state:
